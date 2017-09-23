@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest package="com.ubcorbit.ndk_test"
+<manifest package="com.ubcorbit.ndktest"
           xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
@@ -9,7 +9,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name=".MainActivity">
+        <activity android:name="com.ubcorbit.ndktest.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
 
