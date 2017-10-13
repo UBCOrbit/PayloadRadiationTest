@@ -1,4 +1,4 @@
-package com.ubcorbit.ndktest;
+package com.ubcorbit.radtest;
 
 import android.content.Context;
 import android.support.test.InstrumentationRegistry;

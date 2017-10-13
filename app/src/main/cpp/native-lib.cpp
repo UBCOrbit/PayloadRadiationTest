@@ -1,197 +1,88 @@
 #include <jni.h>
-#include <android/log.h>
+#include "orbit_logging.h"
+#include <unistd.h>
+#include "ramtest.h"
 
 extern "C" {
-
-typedef unsigned char datum;
-
-datum* allocateBlock(unsigned long nBytes)
-{
-    return new datum[nBytes];
-}
-
-void deallocateBlock(datum* ptr)
-{
-    delete []  ptr;
-}
-
-datum** allocateAllBlocks(unsigned int nBlocks, unsigned long blockSize)
-{
-    datum** blocks = new datum*[nBlocks];
-    for(int i = 0; i < nBlocks; i++)
-    {
-        blocks[i] = allocateBlock(blockSize);
-    }
-    return blocks;
-}
-
-void deallocateAllBlocks(datum** blocks, unsigned int nBlocks)
-{
-    for(int i = 0; i < nBlocks; i++)
-    {
-        delete [] blocks[i];
-    }
-    delete [] blocks;
-}
-
-/**********************************************************************
- *
- * Function:    memTestDevice()
- *
- * Description: Test the integrity of a physical memory device by
- *              performing an increment/decrement test over the
- *              entire region.  In the process every storage bit
- *              in the device is tested as a zero and a one.  The
- *              base address and the size of the region are
- *              selected by the caller.
- *
- * Notes:
- *
- * Returns:     NULL if the test succeeds.
- *
- *              A non-zero result is the first address at which an
- *              incorrect value was read back.  By examining the
- *              contents of memory, it may be possible to gather
- *              additional information about the problem.
- *
- **********************************************************************/
-
-void fillPattern(volatile datum* baseAddress, unsigned long nBytes)
-{
-    unsigned long offset;
-    unsigned long nWords = nBytes / sizeof(datum);
-
-    datum pattern;
-
-    // Fill memory with a known pattern.
-    for (pattern = 1, offset = 0; offset < nWords; pattern++, offset++)
-    {
-        baseAddress[offset] = pattern;
-    }
-}
-
-datum* checkAndInvert(volatile datum* baseAddress, unsigned long nBytes)
-{
-    unsigned long offset;
-    unsigned long nWords = nBytes / sizeof(datum);
-
-    datum pattern;
-    datum antipattern;
-
-    // Check each location and invert it for the second pass.
-    for (pattern = 1, offset = 0; offset < nWords; pattern++, offset++)
-    {
-        if (baseAddress[offset] != pattern)
-        {
-            return (datum*)&baseAddress[offset];
-        }
-
-        antipattern = ~pattern;
-        baseAddress[offset] = antipattern;
-    }
-
-    return NULL;
-}
-
-datum* checkInvertedAndZero(volatile datum* baseAddress, unsigned long nBytes)
-{
-    unsigned long offset;
-    unsigned long nWords = nBytes / sizeof(datum);
-
-    datum pattern;
-    datum antipattern;
-
-    // Check each location for the inverted pattern and zero it.
-    for (pattern = 1, offset = 0; offset < nWords; pattern++, offset++)
-    {
-        antipattern = ~pattern;
-        if (baseAddress[offset] != antipattern)
-        {
-            return (datum*)&baseAddress[offset];
-        }
-    }
-
-    return NULL;
-}
 
 void flipBit(volatile datum* baseAddress, unsigned long offset, datum bitMask)
 {
     baseAddress[offset] = baseAddress[offset] ^ bitMask;
 }
 
-JNIEXPORT jlong JNICALL
-Java_com_ubcorbit_ndktest_RAMTester_testRAMAllocate(JNIEnv *env, jobject thisObject, jint numBlocks, jlong bytesPerBlock)
+int main()
 {
-    unsigned int nBlocks = (unsigned int)numBlocks;
-    unsigned long blockSize = (unsigned long)bytesPerBlock;
+    unsigned int sleepTime = 1; // seconds
 
-    datum** blocks = allocateAllBlocks(nBlocks, blockSize);
-    return (jlong)blocks;
-}
+    unsigned int numBlocks = 1;
+    unsigned long blockSize = 1024 * 1024 * 100; // 100 MB
 
-JNIEXPORT void JNICALL
-Java_com_ubcorbit_ndktest_RAMTester_testRAMWrite(JNIEnv *env, jobject thisObject, jlong blocksPtr, jint numBlocks, jlong bytesPerBlock)
-{
-    unsigned int nBlocks = (unsigned int)numBlocks;
-    unsigned long blockSize = (unsigned long)bytesPerBlock;
-    datum** blocks = (datum**)blocksPtr;
+    LOGD("RAM: Allocating...");
+    datum** blocks = allocateAllBlocks(numBlocks, blockSize);
 
-    for(int i = 0;i < nBlocks; i++)
+    long count = 0;
+    while(count < 2)
     {
-        datum* baseAddress = blocks[i];
+        count++;
+        LOGD("--------------------------------------------------------------");
 
-        fillPattern(baseAddress, blockSize);
-    }
-}
+        datum *addressError = NULL;
 
-JNIEXPORT jlong JNICALL
-Java_com_ubcorbit_ndktest_RAMTester_testRAMRead1(JNIEnv *env, jobject thisObject, jlong blocksPtr, jint numBlocks, jlong bytesPerBlock)
-{
-    unsigned int nBlocks = (unsigned int)numBlocks;
-    unsigned long blockSize = (unsigned long)bytesPerBlock;
+        LOGD("RAM: Filling...");
+        for (int i = 0; i < numBlocks; i++)
+        {
+            fillPattern(blocks[i], blockSize);
+        }
 
-    datum** blocks = (datum**)blocksPtr;
+        LOGD("Clearing Cache...");
+        //TODO
 
-    datum* addressError = NULL;
+        LOGD("RAM: Sleeping...");
+        sleep(sleepTime);
 
-    for(int i = 0;i < nBlocks; i++)
-    {
-        datum* baseAddress = blocks[i];
+        LOGD("RAM: Check #1 / Invert");
+        for (int i = 0; i < numBlocks; i++)
+        {
+            addressError = checkAndInvert(blocks[i], blockSize);
+            if (addressError != NULL)
+            {
+                LOGD("Address Error: %ld", (long) addressError);
+                break;
+            }
+        }
+        if(addressError != NULL) continue;
 
-        addressError = checkAndInvert(baseAddress, blockSize);
-        if(addressError != NULL) break;
-    }
+        LOGD("RAM: Sleeping...");
+        sleep(sleepTime);
 
-    return (jlong)addressError;
-}
+        LOGD("RAM: Check #2 / Zero");
+        for (int i = 0; i < numBlocks; i++)
+        {
+            addressError = checkInvertedAndZero(blocks[i], blockSize);
+            if (addressError != NULL)
+            {
+                LOGD("Address Error: %ld", (long) addressError);
+                break;
+            }
+        }
+        if(addressError != NULL) continue;
 
-JNIEXPORT jlong JNICALL
-Java_com_ubcorbit_ndktest_RAMTester_testRAMRead2(JNIEnv *env, jobject thisObject, jlong blocksPtr, jint numBlocks, jlong bytesPerBlock)
-{
-    unsigned int nBlocks = (unsigned int)numBlocks;
-    unsigned long blockSize = (unsigned long)bytesPerBlock;
-
-    datum** blocks = (datum**)blocksPtr;
-
-    datum* addressError = NULL;
-
-    for(int i = 0;i < nBlocks; i++)
-    {
-        datum* baseAddress = blocks[i];
-
-        addressError = checkInvertedAndZero(baseAddress, blockSize);
-        if(addressError != NULL) break;
+        LOGD("RAM: No Errors");
     }
 
-    return (jlong)addressError;
+    LOGD("--------------------------------------------------------------");
+
+    LOGD("RAM: Deallocating...");
+    deallocateAllBlocks(blocks, numBlocks);
+
+    LOGD("RAM: Complete");
+    return 0;
 }
 
-JNIEXPORT jlong JNICALL
-Java_com_ubcorbit_ndktest_RAMTester_testRAMDeAllocate(JNIEnv *env, jobject thisObject, jlong blocksPtr, jint numBlocks, jlong bytesPerBlock)
+JNIEXPORT jint JNICALL
+Java_com_ubcorbit_radtest_RAMTestService_main(JNIEnv *env, jobject thisObject)
 {
-    unsigned int nBlocks = (unsigned int)numBlocks;
-    datum** blocks = (datum**)blocksPtr;
-    deallocateAllBlocks(blocks, nBlocks);
+    return main();
 }
 
 }

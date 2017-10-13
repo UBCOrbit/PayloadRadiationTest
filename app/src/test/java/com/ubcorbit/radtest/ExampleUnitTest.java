@@ -1,4 +1,4 @@
-package com.ubcorbit.ndktest;
+package com.ubcorbit.radtest;
 
 import org.junit.Test;
 
