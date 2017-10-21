@@ -9,7 +9,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name="com.ubcorbit.radtest.MainActivity">
+        <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
 
@@ -18,13 +18,25 @@
         </activity>
 
         <service
-            android:name="com.ubcorbit.radtest.RAMTestService"
+            android:name=".MemTestL1CacheEff"
             android:enabled="true"
             android:exported="true"
-            android:process="com.ubcorbit.radtest.ram">
+            android:process="com.ubcorbit.radtest.memtestl1cacheeff">
         </service>
 
+        <service
+            android:name=".MemTestL2CacheEff"
+            android:enabled="true"
+            android:exported="true"
+            android:process="com.ubcorbit.radtest.memtestl2cacheeff">
+        </service>
 
+        <service
+            android:name=".MemTestCacheIneff"
+            android:enabled="true"
+            android:exported="true"
+            android:process="com.ubcorbit.radtest.memtestcacheineff">
+        </service>
 
     </application>
 

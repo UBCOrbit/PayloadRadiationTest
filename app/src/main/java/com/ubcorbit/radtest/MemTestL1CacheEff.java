@@ -1,25 +1,26 @@
 package com.ubcorbit.radtest;
 
 import android.app.IntentService;
-import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
-import android.os.IBinder;
 import android.support.annotation.Nullable;
-import android.util.Log;
 
-public class RAMTestService extends IntentService
+public class MemTestL1CacheEff extends IntentService
 {
     static
     {
         System.loadLibrary("native-lib");
     }
 
-    /**
-     * Creates an IntentService.  Invoked by your subclass's constructor.
-     */
-    public RAMTestService()
+    public MemTestL1CacheEff()
     {
-        super("RadTestRAM");
+        super("MemTestL1CacheEff");
+    }
+
+    public static void start(Context context)
+    {
+        Intent intent = new Intent(context, MemTestL1CacheEff.class);
+        context.startService(intent);
     }
 
     @Override
