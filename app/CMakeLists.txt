@@ -19,7 +19,8 @@ add_library( # Sets the name of the library.
              # Provides a relative path to your source file(s).
              src/main/cpp/native-lib.cpp
              src/main/cpp/memtest.cpp
-             src/main/cpp/orbit_timing.cpp)
+             src/main/cpp/orbit_timing.cpp
+             src/main/cpp/orbit_cpu_affinity.cpp)
 
 
 # Searches for a specified prebuilt library and stores the path as a

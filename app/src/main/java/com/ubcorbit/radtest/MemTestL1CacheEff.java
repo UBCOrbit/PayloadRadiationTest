@@ -17,18 +17,16 @@ public class MemTestL1CacheEff extends IntentService
         super("MemTestL1CacheEff");
     }
 
-    public static void start(Context context)
-    {
-        Intent intent = new Intent(context, MemTestL1CacheEff.class);
-        context.startService(intent);
-    }
-
     @Override
     protected void onHandleIntent(@Nullable Intent intent)
     {
-        main();
-        stopSelf();
+        if(intent != null)
+        {
+            main(intent.getLongExtra(ServiceStarter.EXTRA_SLEEP_TIME_US, ServiceStarter.DEFAULT_SLEEP_TIME_US),
+                    intent.getIntExtra(ServiceStarter.EXTRA_CPU, CPU.CPU_DEFAULT.cpu));
+            stopSelf();
+        }
     }
 
-    public native int main();
+    public native int main(long sleepTime, int cpu);
 }

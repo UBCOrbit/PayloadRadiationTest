@@ -1,9 +1,9 @@
 #include <stdint.h>
-#include <limits.h>
 #include <unistd.h>
 #include "orbit_logging.h"
 #include "orbit_timing.h"
 #include "memtest.h"
+#include "orbit_cpu_affinity.h"
 
 size_t count1Bits(char value)
 {
@@ -148,118 +148,141 @@ void deallocateMatrix(char** matrix, size_t dim)
     delete [] matrix;
 }
 
+void memtest_cacheEff_core(char** matrix, size_t dim, useconds_t sleepTime, const char *logTag)
+{
+    long double millisecs;
+    size_t tmpResult;
+    memtest_results totalResults = {0,0};
+
+    timestamp_t t0 = get_timestamp();
+
+    //------------------------------------------------------
+
+    // Set 0's
+    cacheEff_setZeros(matrix, dim);
+
+    // Let radiation do its thing
+    usleep(sleepTime);
+
+    // Check 0's, Set 1's
+    tmpResult = cacheEff_checkZerosAndFlip(matrix, dim);
+    totalResults.zeroToOneFlips += tmpResult;
+
+    // Let radiation do its thing
+    usleep(sleepTime);
+
+    // Check 1's, Set 0's
+    tmpResult = cacheEff_checkOnesAndFlip(matrix, dim);
+    totalResults.oneToZeroFlips += tmpResult;
+
+    // Let radiation do its thing
+    usleep(sleepTime);
+
+    //------------------------------------------------------
+
+    timestamp_t t1 = get_timestamp();
+
+    millisecs = (t1 - t0) / 1000.0L;
+
+    LOGD("id=%s,0To1=%ld,1To0=%ld,time=%Lf", logTag, totalResults.zeroToOneFlips, totalResults.oneToZeroFlips, millisecs);
+}
+
+void memtest_cacheIneff_core(char** matrix, size_t dim, useconds_t sleepTime, const char *logTag)
+{
+    long double millisecs;
+    size_t tmpResult;
+    memtest_results totalResults = {0,0};
+
+    timestamp_t t0 = get_timestamp();
+
+    //------------------------------------------------------
+
+    // Set 0's
+    cacheIneff_setZeros(matrix, dim);
+
+    // Let radiation do its thing
+    usleep(sleepTime);
+
+    // Check 0's, Set 1's
+    tmpResult = cacheIneff_checkZerosAndFlip(matrix, dim);
+    totalResults.zeroToOneFlips += tmpResult;
+
+    // Let radiation do its thing
+    usleep(sleepTime);
+
+    // Check 1's, Set 0's
+    tmpResult = cacheIneff_checkOnesAndFlip(matrix, dim);
+    totalResults.oneToZeroFlips += tmpResult;
+
+    // Let radiation do its thing
+    usleep(sleepTime);
+
+    //------------------------------------------------------
+
+    timestamp_t t1 = get_timestamp();
+
+    millisecs = (t1 - t0) / 1000.0L;
+
+    LOGD("id=%s,0To1=%ld,1To0=%ld,time=%Lf", logTag, totalResults.zeroToOneFlips, totalResults.oneToZeroFlips, millisecs);
+}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
 void memtest_cacheEff(useconds_t sleepTime, size_t dim, const char *logTag)
 {
-    long double millisecs;
-
     char** matrix = allocateMatrix(dim);
-
-    size_t tmpResult;
-    memtest_results totalResults = {0,0};
 
     while(true)
     {
-        timestamp_t t0 = get_timestamp();
-
-        //------------------------------------------------------
-
-        // Set 0's
-        LOGD("%s: Setting 0's", logTag);
-        cacheEff_setZeros(matrix, dim);
-
-        // Let radiation do its thing
-        usleep(sleepTime);
-
-        // Check 0's, Set 1's
-        LOGD("%s: Checking 0's, Setting 1's", logTag);
-        tmpResult = cacheEff_checkZerosAndFlip(matrix, dim);
-        totalResults.zeroToOneFlips += tmpResult;
-
-        // Let radiation do its thing
-        usleep(sleepTime);
-
-        // Check 1's, Set 0's
-        LOGD("%s: Checking 1's, Setting 0's", logTag);
-        tmpResult = cacheEff_checkOnesAndFlip(matrix, dim);
-        totalResults.oneToZeroFlips += tmpResult;
-
-        // Let radiation do its thing
-        usleep(sleepTime);
-
-        //------------------------------------------------------
-
-        LOGD("%s: Zero to One Flips = %ld", logTag, totalResults.zeroToOneFlips);
-        LOGD("%s: One to Zero Flips = %ld", logTag, totalResults.oneToZeroFlips);
-
-        timestamp_t t1 = get_timestamp();
-
-        millisecs = (t1 - t0) / 1000.0L;
-        LOGD("%s: Time = %Lf (ms)", logTag, millisecs);
+        memtest_cacheEff_core(matrix, dim, sleepTime, logTag);
     }
 }
 #pragma clang diagnostic pop
 
-void memtest_L1cacheEff(useconds_t sleepTime)
+void memtest_L1cacheEff(useconds_t sleepTime, int cpu)
 {
-    memtest_cacheEff(sleepTime, 96, "MemTestL1CacheEff"); //  9 KB matrix < 16 KB L1 Cache
+    if(cpu != -1) setCurrentThreadAffinity(cpu);
+    memtest_cacheEff(sleepTime, 96, LOG_TAG_MEM_TEST_L1_CACHE_EFF); //  9 KB matrix < 16 KB L1 Cache
 }
 
-void memtest_L2cacheEff(useconds_t sleepTime)
+void memtest_L2cacheEff(useconds_t sleepTime, int cpu)
 {
-    memtest_cacheEff(sleepTime, 1024, "MemTestL2CacheEff"); //  1 MB matrix < 2 MB L2 Cache
+    if(cpu != -1) setCurrentThreadAffinity(cpu);
+    memtest_cacheEff(sleepTime, 1024, LOG_TAG_MEM_TEST_L2_CACHE_EFF); //  1 MB matrix < 2 MB L2 Cache
 }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
-void memtest_cacheIneff(useconds_t sleepTime)
+void memtest_cacheIneff(useconds_t sleepTime, int cpu)
 {
-    const char* logTag = "MemTestCacheIneff";
-    const const size_t dim = 2048; //  4 MB matrix > 2 MB L2 Cache
+    if(cpu != -1) setCurrentThreadAffinity(cpu);
 
-    long double millisecs;
+    const size_t dim = 2048; //  4 MB matrix > 2 MB L2 Cache
 
     char** matrix = allocateMatrix(dim);
 
-    size_t tmpResult;
-    memtest_results totalResults = {0,0};
+    while(true)
+    {
+        memtest_cacheEff_core(matrix, dim, sleepTime, LOG_TAG_MEM_TEST_CACHE_INEFF);
+    }
+}
+#pragma clang diagnostic pop
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
+void memtest_cacheCompare(useconds_t sleepTime)
+{
+    const char* logTag = "MemTestCacheCompare";
+
+    size_t dim = 2048;
+
+    char** matrixEff = allocateMatrix(2048);
+    char** matrixIneff = allocateMatrix(2048);
 
     while(true)
     {
-        timestamp_t t0 = get_timestamp();
-
-        //------------------------------------------------------
-
-        // Set 0's
-        LOGD("%s: Setting 0's", logTag);
-        cacheIneff_setZeros(matrix, dim);
-
-        // Let radiation do its thing
-        usleep(sleepTime);
-
-        // Check 0's, Set 1's
-        LOGD("%s: Checking 0's, Setting 1's", logTag);
-        tmpResult = cacheIneff_checkZerosAndFlip(matrix, dim);
-        totalResults.zeroToOneFlips += tmpResult;
-
-        // Let radiation do its thing
-        usleep(sleepTime);
-
-        // Check 1's, Set 0's
-        LOGD("%s: Checking 1's, Setting 0's", logTag);
-        tmpResult = cacheIneff_checkOnesAndFlip(matrix, dim);
-        totalResults.oneToZeroFlips += tmpResult;
-
-        // Let radiation do its thing
-        usleep(sleepTime);
-
-        //------------------------------------------------------
-
-        timestamp_t t1 = get_timestamp();
-
-        millisecs = (t1 - t0) / 1000.0L;
-        LOGD("%s: Time = %Lf (ms)", logTag, millisecs);
+        memtest_cacheEff_core(matrixEff, dim, sleepTime, logTag);
+        memtest_cacheIneff_core(matrixIneff, dim, sleepTime, logTag);
     }
 }
 #pragma clang diagnostic pop
